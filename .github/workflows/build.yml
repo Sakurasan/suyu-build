@@ -17,6 +17,7 @@ jobs:
       LIBVULKAN_PATH: /opt/homebrew/lib/libvulkan.dylib
       LLVM_DIR: /opt/homebrew/opt/llvm@17
       FFMPEG_DIR: /opt/homebrew/opt/ffmpeg
+      VULKAN_SDK: /opt/homebrew/opt/vulkan-headers      
 
     steps:
       - name: Checkout Repository
@@ -31,7 +32,7 @@ jobs:
             autoconf automake boost ccache ffmpeg fmt glslang hidapi \
             libtool libusb lz4 ninja nlohmann-json openssl pkg-config \
             qt@5 sdl2 speexdsp zlib zstd cmake Catch2 molten-vk \
-            vulkan-loader dylibbundler
+            vulkan-headers vulkan-loader
 
       - name: Prepare Build Environment
         run: |
@@ -50,10 +51,11 @@ jobs:
             -DSDL_ARMNEON=ON \
             -DENABLE_QT6=OFF \
             -DENABLE_QT_TRANSLATION=ON \
-            -DSUYU_USE_EXTERNAL_VULKAN_HEADERS=OFF \
+            -DSUYU_USE_EXTERNAL_VULKAN_HEADERS=ON \
             -DCLANG_FORMAT=ON \
-            -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
-
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
+            -DVULKAN_HEADERS_INSTALL_DIR=$(brew --prefix vulkan-headers)
+            
       - name: Build Suyu
         working-directory: build
         run: ninja
