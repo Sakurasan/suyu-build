@@ -29,7 +29,7 @@ jobs:
         run: |
           brew update
           brew install \
-            autoconf automake boost ccache ffmpeg fmt glslang hidapi \
+            autoconf automake boost@1.81 ccache ffmpeg fmt glslang hidapi \
             libtool libusb lz4 ninja nlohmann-json openssl pkg-config \
             qt@5 sdl2 speexdsp zlib zstd cmake Catch2 molten-vk \
             vulkan-headers vulkan-loader
@@ -54,7 +54,8 @@ jobs:
             -DSUYU_USE_EXTERNAL_VULKAN_HEADERS=ON \
             -DCLANG_FORMAT=ON \
             -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
-            -DVULKAN_HEADERS_INSTALL_DIR=$(brew --prefix vulkan-headers)
+            -DVULKAN_HEADERS_INSTALL_DIR=$(brew --prefix vulkan-headers) \
+            -DCMAKE_CXX_FLAGS="-v"  # Add verbose compiler output
             
       - name: Build Suyu
         working-directory: build
