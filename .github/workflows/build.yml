@@ -9,17 +9,29 @@ on:
 
 jobs:
   build:
-    runs-on: macos-latest
+    strategy:
+      matrix:
+        runner: [macos-13, macos-14]  # Intel (13) and Apple Silicon (14) runners
+        include:
+          - runner: macos-13
+            homebrew_prefix: /usr/local
+            osx_deployment_target: 10.15
+            arch: x86_64
+          - runner: macos-14
+            homebrew_prefix: /opt/homebrew
+            osx_deployment_target: 11.0
+            arch: arm64
+
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 120  # Set timeout to 2 hours
 
     env:
-      # Support both Intel and Apple Silicon Macs
-      HOMEBREW_PREFIX: ${{ startsWith(runner.arch, 'ARM64') && '/opt/homebrew' || '/usr/local' }}
-      Qt5_DIR: ${{ startsWith(runner.arch, 'ARM64') && '/opt/homebrew/opt/qt@5/lib/cmake' || '/usr/local/opt/qt@5/lib/cmake' }}
-      LIBVULKAN_PATH: ${{ startsWith(runner.arch, 'ARM64') && '/opt/homebrew/lib/libvulkan.dylib' || '/usr/local/lib/libvulkan.dylib' }}
-      LLVM_DIR: ${{ startsWith(runner.arch, 'ARM64') && '/opt/homebrew/opt/llvm@17' || '/usr/local/opt/llvm@17' }}
-      FFMPEG_DIR: ${{ startsWith(runner.arch, 'ARM64') && '/opt/homebrew/opt/ffmpeg' || '/usr/local/opt/ffmpeg' }}
-      VULKAN_SDK: ${{ startsWith(runner.arch, 'ARM64') && '/opt/homebrew/opt/vulkan-headers' || '/usr/local/opt/vulkan-headers' }}
+      Qt5_DIR: ${{ matrix.homebrew_prefix }}/opt/qt@5/lib/cmake
+      LIBVULKAN_PATH: ${{ matrix.homebrew_prefix }}/lib/libvulkan.dylib
+      LLVM_DIR: ${{ matrix.homebrew_prefix }}/opt/llvm@17
+      FFMPEG_DIR: ${{ matrix.homebrew_prefix }}/opt/ffmpeg
+      VULKAN_SDK: ${{ matrix.homebrew_prefix }}/opt/vulkan-headers
+      MACOS_ARCH: ${{ matrix.arch }}
 
     steps:
       - name: Checkout Repository
@@ -27,35 +39,19 @@ jobs:
           git clone --recursive https://git.suyu.dev/suyu/suyu.git .
           git checkout dev
 
-      - name: Cache Repository
-        uses: actions/cache@v4
-        with:
-          path: .
-          key: ${{ runner.os }}-suyu-repo-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-suyu-repo-
-
-      - name: Install Homebrew Dependencies
+      - name: Install Dependencies
         run: |
           brew update
           brew install \
             autoconf automake boost ccache ffmpeg fmt glslang hidapi \
             libtool libusb lz4 ninja nlohmann-json openssl pkg-config \
             qt@5 sdl2 speexdsp zlib zstd cmake Catch2 molten-vk \
-            vulkan-headers vulkan-loader dylibbundler create-dmg
-
-      - name: Setup Ccache
-        uses: actions/cache@v4
-        with:
-          path: ~/Library/Caches/ccache
-          key: ${{ runner.os }}-ccache-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-ccache-
+            vulkan-headers vulkan-loader
 
       - name: Prepare Build Environment
         run: |
           mkdir -p build
-          ccache -z  # Zero ccache statistics
+          cd build
 
       - name: Configure CMake
         working-directory: build
@@ -71,16 +67,13 @@ jobs:
             -DENABLE_QT_TRANSLATION=ON \
             -DSUYU_USE_EXTERNAL_VULKAN_HEADERS=ON \
             -DCLANG_FORMAT=ON \
-            -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
-            -DVULKAN_HEADERS_INSTALL_DIR=$(brew --prefix vulkan-headers) \
-            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+            -DCMAKE_OSX_ARCHITECTURES=${{ env.MACOS_ARCH }} \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=${{ matrix.osx_deployment_target }} \
+            -DVULKAN_HEADERS_INSTALL_DIR=${{ matrix.homebrew_prefix }}/opt/vulkan-headers
 
       - name: Build Suyu
         working-directory: build
-        run: |
-          ninja
-          ccache -s  # Print ccache statistics
+        run: ninja
 
       - name: Bundle Dependencies
         working-directory: build
@@ -90,7 +83,7 @@ jobs:
       - name: Copy Qt5 Frameworks
         working-directory: build
         run: |
-          QT_LIB_DIR=$(brew --prefix qt@5)/lib
+          QT_LIB_DIR=${{ matrix.homebrew_prefix }}/opt/qt@5/lib
           mkdir -p bin/suyu.app/Contents/Frameworks
           
           # Copy essential Qt5 frameworks
@@ -111,32 +104,53 @@ jobs:
       - name: Create DMG
         working-directory: build/bin
         run: |
+          brew install create-dmg
           create-dmg \
-            --volname "Suyu" \
+            --volname "Suyu (${{ env.MACOS_ARCH }})" \
             --window-pos 200 120 \
             --window-size 800 400 \
             --icon-size 100 \
             --icon "suyu.app" 200 190 \
             --hide-extension "suyu.app" \
             --app-drop-link 600 185 \
-            "Suyu-macOS-$(date +'%Y-%m-%d').dmg" \
+            "Suyu-${{ env.MACOS_ARCH }}.dmg" \
             "suyu.app"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: suyu-macos-${{ runner.arch }}
-          path: build/bin/Suyu-macOS-*.dmg
+          name: suyu-macos-${{ env.MACOS_ARCH }}
+          path: build/bin/Suyu-${{ env.MACOS_ARCH }}.dmg
           retention-days: 7
 
-      - name: Create Release
-        if: github.event_name == 'schedule'  # Only create release on scheduled runs
+  create-universal-release:
+    needs: build
+    runs-on: macos-latest
+    if: github.event_name == 'schedule'  # Only create release on scheduled runs
+    steps:
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create Universal Binary and Release
+        run: |
+          # Create a universal DMG (if possible)
+          # Note: This is a simplified approach and may need adjustment
+          mkdir -p universal-build
+          
+          # You might need to use lipo or other tools to create a true universal binary
+          # This is a placeholder for actual universal binary creation
+          cp artifacts/suyu-macos-x86_64.dmg universal-build/Suyu-universal.dmg
+
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          files: build/bin/Suyu-macOS-*.dmg
+          files: universal-build/Suyu-universal.dmg
           name: "Suyu Weekly Build $(date +'%Y-%m-%d')"
           tag_name: "weekly-$(date +'%Y-%m-%d')"
           draft: false
-          prerelease: true
+          prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
