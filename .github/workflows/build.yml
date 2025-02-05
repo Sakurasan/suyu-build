@@ -69,8 +69,7 @@ jobs:
             -DCLANG_FORMAT=ON \
             -DCMAKE_OSX_ARCHITECTURES=${{ env.MACOS_ARCH }} \
             -DCMAKE_OSX_DEPLOYMENT_TARGET=${{ matrix.osx_deployment_target }} \
-            -DVULKAN_HEADERS_INSTALL_DIR=${{ matrix.homebrew_prefix }}/opt/vulkan-headers \
-            -DBOOST_ASIO_ENABLE_OLD_SERVICES
+            -DVULKAN_HEADERS_INSTALL_DIR=${{ matrix.homebrew_prefix }}/opt/vulkan-headers 
 
       - name: Build Suyu
         working-directory: build
