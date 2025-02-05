@@ -13,31 +13,43 @@ jobs:
     timeout-minutes: 120  # Set timeout to 2 hours
 
     env:
-      Qt5_DIR: /opt/homebrew/opt/qt@5/lib/cmake
-      LIBVULKAN_PATH: /opt/homebrew/lib/libvulkan.dylib
-      LLVM_DIR: /opt/homebrew/opt/llvm@17
-      FFMPEG_DIR: /opt/homebrew/opt/ffmpeg
-      VULKAN_SDK: /opt/homebrew/opt/vulkan-headers      
+      # Support both Intel and Apple Silicon Macs
+      HOMEBREW_PREFIX: ${{ startsWith(runner.arch, 'ARM64') && '/opt/homebrew' || '/usr/local' }}
+      Qt5_DIR: ${{ startsWith(runner.arch, 'ARM64') && '/opt/homebrew/opt/qt@5/lib/cmake' || '/usr/local/opt/qt@5/lib/cmake' }}
+      LIBVULKAN_PATH: ${{ startsWith(runner.arch, 'ARM64') && '/opt/homebrew/lib/libvulkan.dylib' || '/usr/local/lib/libvulkan.dylib' }}
+      LLVM_DIR: ${{ startsWith(runner.arch, 'ARM64') && '/opt/homebrew/opt/llvm@17' || '/usr/local/opt/llvm@17' }}
+      FFMPEG_DIR: ${{ startsWith(runner.arch, 'ARM64') && '/opt/homebrew/opt/ffmpeg' || '/usr/local/opt/ffmpeg' }}
+      VULKAN_SDK: ${{ startsWith(runner.arch, 'ARM64') && '/opt/homebrew/opt/vulkan-headers' || '/usr/local/opt/vulkan-headers' }}
 
     steps:
       - name: Checkout Repository
-        run: |
-          git clone --recursive https://git.suyu.dev/suyu/suyu.git .
-          git checkout dev
+        uses: actions/checkout@v4
+        with:
+          repository: 'suyu-dev/suyu'
+          submodules: recursive
+          ref: dev  # Explicitly checkout dev branch
 
-      - name: Install Dependencies
+      - name: Install Homebrew Dependencies
         run: |
           brew update
           brew install \
             autoconf automake boost ccache ffmpeg fmt glslang hidapi \
             libtool libusb lz4 ninja nlohmann-json openssl pkg-config \
             qt@5 sdl2 speexdsp zlib zstd cmake Catch2 molten-vk \
-            vulkan-headers vulkan-loader
+            vulkan-headers vulkan-loader dylibbundler create-dmg
+
+      - name: Setup Ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/ccache
+          key: ${{ runner.os }}-ccache-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-ccache-
 
       - name: Prepare Build Environment
         run: |
           mkdir -p build
-          cd build
+          ccache -z  # Zero ccache statistics
 
       - name: Configure CMake
         working-directory: build
@@ -55,11 +67,14 @@ jobs:
             -DCLANG_FORMAT=ON \
             -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
             -DVULKAN_HEADERS_INSTALL_DIR=$(brew --prefix vulkan-headers) \
-            -DCMAKE_CXX_FLAGS="-v"  # Add verbose compiler output
-            
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+
       - name: Build Suyu
         working-directory: build
-        run: ninja
+        run: |
+          ninja
+          ccache -s  # Print ccache statistics
 
       - name: Bundle Dependencies
         working-directory: build
@@ -90,7 +105,6 @@ jobs:
       - name: Create DMG
         working-directory: build/bin
         run: |
-          brew install create-dmg
           create-dmg \
             --volname "Suyu" \
             --window-pos 200 120 \
@@ -99,24 +113,24 @@ jobs:
             --icon "suyu.app" 200 190 \
             --hide-extension "suyu.app" \
             --app-drop-link 600 185 \
-            "Suyu.dmg" \
+            "Suyu-macOS-$(date +'%Y-%m-%d').dmg" \
             "suyu.app"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: suyu-macos
-          path: build/bin/Suyu.dmg
+          name: suyu-macos-${{ runner.arch }}
+          path: build/bin/Suyu-macOS-*.dmg
           retention-days: 7
 
       - name: Create Release
         if: github.event_name == 'schedule'  # Only create release on scheduled runs
         uses: softprops/action-gh-release@v1
         with:
-          files: build/bin/Suyu.dmg
+          files: build/bin/Suyu-macOS-*.dmg
           name: "Suyu Weekly Build $(date +'%Y-%m-%d')"
           tag_name: "weekly-$(date +'%Y-%m-%d')"
           draft: false
-          prerelease: false
+          prerelease: true
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
