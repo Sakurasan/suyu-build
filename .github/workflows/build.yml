@@ -23,11 +23,17 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        run: |
+          git clone --recursive https://git.suyu.dev/suyu/suyu.git .
+          git checkout dev
+
+      - name: Cache Repository
+        uses: actions/cache@v4
         with:
-          repository: 'suyu-dev/suyu'
-          submodules: recursive
-          ref: dev  # Explicitly checkout dev branch
+          path: .
+          key: ${{ runner.os }}-suyu-repo-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-suyu-repo-
 
       - name: Install Homebrew Dependencies
         run: |
