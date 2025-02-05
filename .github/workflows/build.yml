@@ -1,0 +1,95 @@
+name: Weekly Suyu Build
+
+on:
+  schedule:
+    - cron: '0 0 * * 0'  # Runs at 00:00 every Sunday
+  watch: 
+    types: [started]
+  workflow_dispatch:  # Allows manual trigger
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 120  # Set timeout to 2 hours
+
+    env:
+      LLVM_DIR: /usr/local/opt/llvm@17
+      FFMPEG_DIR: /usr/local/opt/ffmpeg
+
+    steps:
+      - name: Check out repository
+        run: |
+          git clone --recursive https://git.suyu.dev/suyu/suyu.git .
+          git checkout dev
+
+      - name: Set up Homebrew
+        run: |
+          brew update
+          
+      - name: Install dependencies
+        run: |
+          brew install \
+            autoconf automake boost ccache cmake dylibbundler ffmpeg fmt glslang \
+            hidapi libtool libusb llvm@17 lz4 ninja nlohmann-json openssl pkg-config \
+            qt@6 sdl2 speexdsp vulkan-loader zlib zstd
+
+      - name: Create build directory
+        run: mkdir -p build
+
+      - name: Configure CMake
+        working-directory: build
+        run: |
+          cmake .. -GNinja \
+            -DCMAKE_BUILD_TYPE=RELEASE \
+            -DSUYU_USE_BUNDLED_VCPKG=OFF \
+            -DSUYU_TESTS=OFF \
+            -DENABLE_WEB_SERVICE=OFF \
+            -DENABLE_LIBUSB=OFF \
+            -DSDL_ARMNEON=ON \
+            -DENABLE_QT6=ON \
+            -DENABLE_QT_TRANSLATION=ON \
+            -DSUYU_USE_EXTERNAL_VULKAN_HEADERS=OFF \
+            -DUSE_SYSTEM_MOLTENVK=OFF
+
+      - name: Build
+        working-directory: build
+        run: ninja
+
+      - name: Bundle dependencies
+        working-directory: build
+        run: |
+          dylibbundler -of -cd -b -x bin/suyu.app/Contents/MacOS/suyu -d bin/suyu.app/Contents/libs/
+
+      - name: Create DMG
+        working-directory: build/bin
+        run: |
+          brew install create-dmg
+          create-dmg \
+            --volname "Suyu" \
+            --window-pos 200 120 \
+            --window-size 800 400 \
+            --icon-size 100 \
+            --icon "suyu.app" 200 190 \
+            --hide-extension "suyu.app" \
+            --app-drop-link 600 185 \
+            "Suyu.dmg" \
+            "suyu.app"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: suyu-macos
+          path: build/bin/Suyu.dmg
+          retention-days: 7
+
+      - name: Create Release
+        if: github.event_name == 'schedule'  # Only create release on scheduled runs
+        uses: softprops/action-gh-release@v1
+        with:
+          files: build/bin/Suyu.dmg
+          name: "Suyu Weekly Build $(date +'%Y-%m-%d')"
+          tag_name: "weekly-$(date +'%Y-%m-%d')"
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
