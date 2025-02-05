@@ -1,4 +1,4 @@
-name: Weekly Suyu Build
+name: Weekly Suyu Build (macOS)
 
 on:
   schedule:
@@ -13,52 +13,76 @@ jobs:
     timeout-minutes: 120  # Set timeout to 2 hours
 
     env:
-      LLVM_DIR: /usr/local/opt/llvm@17
-      FFMPEG_DIR: /usr/local/opt/ffmpeg
+      Qt5_DIR: /opt/homebrew/opt/qt@5/lib/cmake
+      LIBVULKAN_PATH: /opt/homebrew/lib/libvulkan.dylib
+      LLVM_DIR: /opt/homebrew/opt/llvm@17
+      FFMPEG_DIR: /opt/homebrew/opt/ffmpeg
 
     steps:
-      - name: Check out repository
+      - name: Checkout Repository
         run: |
           git clone --recursive https://git.suyu.dev/suyu/suyu.git .
           git checkout dev
 
-      - name: Set up Homebrew
+      - name: Install Dependencies
         run: |
           brew update
-          
-      - name: Install dependencies
-        run: |
           brew install \
-            autoconf automake boost ccache cmake dylibbundler ffmpeg fmt glslang \
-            hidapi libtool libusb llvm@17 lz4 ninja nlohmann-json openssl pkg-config \
-            qt@6 sdl2 speexdsp vulkan-loader zlib zstd
+            autoconf automake boost ccache ffmpeg fmt glslang hidapi \
+            libtool libusb lz4 ninja nlohmann-json openssl pkg-config \
+            qt@5 sdl2 speexdsp zlib zstd cmake Catch2 molten-vk \
+            vulkan-loader dylibbundler
 
-      - name: Create build directory
-        run: mkdir -p build
+      - name: Prepare Build Environment
+        run: |
+          mkdir -p build
+          cd build
 
       - name: Configure CMake
         working-directory: build
         run: |
           cmake .. -GNinja \
-            -DCMAKE_BUILD_TYPE=RELEASE \
+            -DCMAKE_BUILD_TYPE=Release \
             -DSUYU_USE_BUNDLED_VCPKG=OFF \
             -DSUYU_TESTS=OFF \
             -DENABLE_WEB_SERVICE=OFF \
             -DENABLE_LIBUSB=OFF \
             -DSDL_ARMNEON=ON \
-            -DENABLE_QT6=ON \
+            -DENABLE_QT6=OFF \
             -DENABLE_QT_TRANSLATION=ON \
             -DSUYU_USE_EXTERNAL_VULKAN_HEADERS=OFF \
-            -DUSE_SYSTEM_MOLTENVK=OFF
+            -DCLANG_FORMAT=ON \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
 
-      - name: Build
+      - name: Build Suyu
         working-directory: build
         run: ninja
 
-      - name: Bundle dependencies
+      - name: Bundle Dependencies
         working-directory: build
         run: |
           dylibbundler -of -cd -b -x bin/suyu.app/Contents/MacOS/suyu -d bin/suyu.app/Contents/libs/
+
+      - name: Copy Qt5 Frameworks
+        working-directory: build
+        run: |
+          QT_LIB_DIR=$(brew --prefix qt@5)/lib
+          mkdir -p bin/suyu.app/Contents/Frameworks
+          
+          # Copy essential Qt5 frameworks
+          qt_frameworks=(
+            "QtCore"
+            "QtGui"
+            "QtWidgets"
+            "QtNetwork"
+            "QtConcurrent"
+            "QtPrintSupport"
+            "QtSvg"
+          )
+          
+          for framework in "${qt_frameworks[@]}"; do
+            cp -R "$QT_LIB_DIR/${framework}.framework" bin/suyu.app/Contents/Frameworks/
+          done
 
       - name: Create DMG
         working-directory: build/bin
@@ -75,7 +99,7 @@ jobs:
             "Suyu.dmg" \
             "suyu.app"
 
-      - name: Upload artifact
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: suyu-macos
