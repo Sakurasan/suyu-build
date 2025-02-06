@@ -34,6 +34,10 @@ jobs:
       MACOS_ARCH: ${{ matrix.arch }}
 
     steps:
+      - name: Clean workspace
+        run: |
+          rm -rf ./* ./.[!.]*
+
       - name: Install CMake
         run: |
           echo ${{ github.event.repository.owner.login }}
@@ -54,7 +58,7 @@ jobs:
       - name: Install Vulkan SDK Components
         run: |
           # Set up version variables
-          VULKAN_VERSION="1.3.274"
+          VULKAN_VERSION="1.3.302"
           INSTALL_DIR="${{ matrix.homebrew_prefix }}/opt/vulkan-sdk"
           
           # Create installation directory
