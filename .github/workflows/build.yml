@@ -48,18 +48,7 @@ jobs:
             autoconf automake boost ccache ffmpeg fmt glslang hidapi \
             libtool libusb lz4 ninja nlohmann-json openssl pkg-config \
             qt@5 sdl2 speexdsp zlib zstd Catch2 \
-            molten-vk 
-            #vulkan-headers vulkan-loader
-
-          # Install specific versions of Vulkan components
-          # brew install --force-bottle molten-vk@1.2.1
-          brew install vulkan-headers@1.3.250
-          brew install vulkan-loader@1.3.250
-          
-          # Create necessary symlinks
-          brew link --force molten-vk@1.2.1
-          brew link --force vulkan-headers@1.3.250
-          brew link --force vulkan-loader@1.3.250
+            molten-vk vulkan-headers vulkan-loader
 
       - name: Checkout Repository
         run: |
@@ -76,10 +65,12 @@ jobs:
         working-directory: build
         run: |
           # Set specific Vulkan environment variables
-          export VULKAN_SDK=${{ matrix.homebrew_prefix }}/opt/vulkan-headers@1.3.250
+          export VULKAN_SDK=${{ matrix.homebrew_prefix }}/opt/vulkan-headers
           export VK_ICD_FILENAMES=${{ matrix.homebrew_prefix }}/share/vulkan/icd.d/MoltenVK_icd.json
           export VK_LAYER_PATH=${{ matrix.homebrew_prefix }}/share/vulkan/explicit_layer.d
-                  
+          export VULKAN_LOADER_DYNAMIC_LIB_PATH=${{ matrix.homebrew_prefix }}/lib/libvulkan.dylib
+
+          # Configure CMake with Ninja
           cmake .. -GNinja \
             -DCMAKE_BUILD_TYPE=Release \
             -DSUYU_USE_BUNDLED_VCPKG=OFF \
@@ -91,7 +82,6 @@ jobs:
             -DENABLE_QT_TRANSLATION=ON \
             -DSUYU_USE_EXTERNAL_VULKAN_HEADERS=OFF \
             -DCLANG_FORMAT=ON \
-            -DVULKAN_VERSION=1.3.250 \
             -DCMAKE_OSX_ARCHITECTURES=${{ env.MACOS_ARCH }} \
             -DCMAKE_OSX_DEPLOYMENT_TARGET=${{ matrix.osx_deployment_target }} \
             -DVULKAN_HEADERS_INSTALL_DIR=${{ matrix.homebrew_prefix }}/opt/vulkan-headers 
