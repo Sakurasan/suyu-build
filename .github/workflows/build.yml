@@ -9,29 +9,16 @@ on:
 
 jobs:
   build:
-    strategy:
-      matrix:
-        runner: [macos-13, macos-latest]  # Intel (13) and Apple Silicon (14) runners
-        include:
-          - runner: macos-13
-            homebrew_prefix: /usr/local
-            osx_deployment_target: 10.15
-            arch: x86_64
-          - runner: macos-latest
-            homebrew_prefix: /opt/homebrew
-            osx_deployment_target: 11.0
-            arch: arm64
-
-    runs-on: ${{ matrix.runner }}
+    runs-on: macos-latest
     timeout-minutes: 120  # Set timeout to 2 hours
 
     env:
-      Qt5_DIR: ${{ matrix.homebrew_prefix }}/opt/qt@5/lib/cmake
-      LIBVULKAN_PATH: ${{ matrix.homebrew_prefix }}/lib/libvulkan.dylib
-      LLVM_DIR: ${{ matrix.homebrew_prefix }}/opt/llvm@17
-      FFMPEG_DIR: ${{ matrix.homebrew_prefix }}/opt/ffmpeg
-      VULKAN_SDK: ${{ matrix.homebrew_prefix }}/opt/vulkan-headers
-      MACOS_ARCH: ${{ matrix.arch }}
+      Qt5_DIR: /opt/homebrew/opt/qt@5/lib/cmake
+      LIBVULKAN_PATH: /opt/homebrew/lib/libvulkan.dylib
+      LLVM_DIR: /opt/homebrew/opt/llvm@17
+      FFMPEG_DIR: /opt/homebrew/opt/ffmpeg
+      VULKAN_SDK: /opt/homebrew/opt/vulkan-headers
+      MACOS_ARCH: arm64
 
     steps:
       - name: Clean workspace
@@ -59,7 +46,7 @@ jobs:
         run: |
           # Set up version variables
           VULKAN_VERSION="1.3.302"
-          INSTALL_DIR="${{ matrix.homebrew_prefix }}/opt/vulkan-sdk"
+          INSTALL_DIR="/opt/homebrew/opt/vulkan-sdk"
           
           # Create installation directory
           sudo mkdir -p $INSTALL_DIR
@@ -87,7 +74,7 @@ jobs:
           # Set up environment variables
           echo "VULKAN_SDK=$INSTALL_DIR" >> $GITHUB_ENV
           echo "VK_LAYER_PATH=$INSTALL_DIR/share/vulkan/explicit_layer.d" >> $GITHUB_ENV
-          echo "VK_ICD_FILENAMES=${{ matrix.homebrew_prefix }}/share/vulkan/icd.d/MoltenVK_icd.json" >> $GITHUB_ENV
+          echo "VK_ICD_FILENAMES=/opt/homebrew/share/vulkan/icd.d/MoltenVK_icd.json" >> $GITHUB_ENV
           
           # Add to pkg-config path
           echo "PKG_CONFIG_PATH=$INSTALL_DIR/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
@@ -111,10 +98,10 @@ jobs:
         working-directory: build
         run: |
           # Set specific Vulkan environment variables
-          export VULKAN_SDK=${{ matrix.homebrew_prefix }}/opt/vulkan-headers
-          export VK_ICD_FILENAMES=${{ matrix.homebrew_prefix }}/share/vulkan/icd.d/MoltenVK_icd.json
-          export VK_LAYER_PATH=${{ matrix.homebrew_prefix }}/share/vulkan/explicit_layer.d
-          export VULKAN_LOADER_DYNAMIC_LIB_PATH=${{ matrix.homebrew_prefix }}/lib/libvulkan.dylib
+          export VULKAN_SDK=/opt/homebrew/opt/vulkan-headers
+          export VK_ICD_FILENAMES=/opt/homebrew/share/vulkan/icd.d/MoltenVK_icd.json
+          export VK_LAYER_PATH=/opt/homebrew/share/vulkan/explicit_layer.d
+          export VULKAN_LOADER_DYNAMIC_LIB_PATH=/opt/homebrew/lib/libvulkan.dylib
 
           # Configure CMake with Ninja
           cmake .. -GNinja \
@@ -129,8 +116,8 @@ jobs:
             -DSUYU_USE_EXTERNAL_VULKAN_HEADERS=OFF \
             -DCLANG_FORMAT=ON \
             -DCMAKE_OSX_ARCHITECTURES=${{ env.MACOS_ARCH }} \
-            -DCMAKE_OSX_DEPLOYMENT_TARGET=${{ matrix.osx_deployment_target }} \
-            -DVULKAN_HEADERS_INSTALL_DIR=${{ matrix.homebrew_prefix }}/opt/vulkan-headers 
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
+            -DVULKAN_HEADERS_INSTALL_DIR=/opt/homebrew/opt/vulkan-headers 
 
       - name: Build Suyu
         working-directory: build
@@ -144,7 +131,7 @@ jobs:
       - name: Copy Qt5 Frameworks
         working-directory: build
         run: |
-          QT_LIB_DIR=${{ matrix.homebrew_prefix }}/opt/qt@5/lib
+          QT_LIB_DIR=/opt/homebrew/opt/qt@5/lib
           mkdir -p bin/suyu.app/Contents/Frameworks
           
           # Copy essential Qt5 frameworks
@@ -167,48 +154,28 @@ jobs:
         run: |
           brew install create-dmg
           create-dmg \
-            --volname "Suyu (${{ env.MACOS_ARCH }})" \
+            --volname "Suyu (arm64)" \
             --window-pos 200 120 \
             --window-size 800 400 \
             --icon-size 100 \
             --icon "suyu.app" 200 190 \
             --hide-extension "suyu.app" \
             --app-drop-link 600 185 \
-            "Suyu-${{ env.MACOS_ARCH }}.dmg" \
+            "Suyu-arm64.dmg" \
             "suyu.app"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: suyu-macos-${{ env.MACOS_ARCH }}
-          path: build/bin/Suyu-${{ env.MACOS_ARCH }}.dmg
+          name: suyu-macos-arm64
+          path: build/bin/Suyu-arm64.dmg
           retention-days: 7
 
-  create-universal-release:
-    needs: build
-    runs-on: macos-latest
-    if: github.event_name == 'schedule'  # Only create release on scheduled runs
-    steps:
-      - name: Download Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-          merge-multiple: true
-
-      - name: Create Universal Binary and Release
-        run: |
-          # Create a universal DMG (if possible)
-          # Note: This is a simplified approach and may need adjustment
-          mkdir -p universal-build
-          
-          # You might need to use lipo or other tools to create a true universal binary
-          # This is a placeholder for actual universal binary creation
-          cp artifacts/suyu-macos-x86_64.dmg universal-build/Suyu-universal.dmg
-
-      - name: Create GitHub Release
+      - name: Create Release
+        if: github.event_name == 'schedule'  # Only create release on scheduled runs
         uses: softprops/action-gh-release@v1
         with:
-          files: universal-build/Suyu-universal.dmg
+          files: build/bin/Suyu-arm64.dmg
           name: "Suyu Weekly Build $(date +'%Y-%m-%d')"
           tag_name: "weekly-$(date +'%Y-%m-%d')"
           draft: false
