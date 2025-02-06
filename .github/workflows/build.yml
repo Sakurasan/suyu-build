@@ -36,14 +36,16 @@ jobs:
     steps:
       - name: Checkout Repository
         run: |
+          echo ${{ github.event.repository.owner.login }}
           system_profiler SPHardwareDataType
           git clone --recursive https://git.suyu.dev/suyu/suyu.git .
           git checkout dev
+          git submodule update --init --recursive
 
       - name: Install CMake
         run: |
           brew update
-          brew install cmake
+          brew install git ffmpeg boost cmake molten-vk vulkan-loader
           cmake --version
 
       - name: Install Other Dependencies
