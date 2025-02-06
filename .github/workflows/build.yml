@@ -39,14 +39,25 @@ jobs:
           git clone --recursive https://git.suyu.dev/suyu/suyu.git .
           git checkout dev
 
-      - name: Install Dependencies
+      - name: Install CMake
         run: |
           brew update
+          brew install cmake
+          cmake --version
+
+      - name: Install Other Dependencies
+        run: |
           brew install \
             autoconf automake boost@1.76 ccache ffmpeg fmt glslang hidapi \
             libtool libusb lz4 ninja nlohmann-json openssl pkg-config \
-            qt@5 sdl2 speexdsp zlib zstd cmake Catch2 molten-vk \
+            qt@5 sdl2 speexdsp zlib zstd Catch2 molten-vk \
             vulkan-headers vulkan-loader
+          
+          # Verify critical dependencies
+          brew list qt@5
+          brew list boost
+          brew list ninja
+
 
       - name: Prepare Build Environment
         run: |
