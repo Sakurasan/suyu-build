@@ -45,7 +45,7 @@ jobs:
       - name: Install Other Dependencies
         run: |
           brew install \
-            autoconf automake boost ccache ffmpeg fmt glslang@11 hidapi \
+            autoconf automake boost ccache ffmpeg fmt glslang hidapi \
             libtool libusb lz4 ninja nlohmann-json openssl pkg-config \
             qt@5 sdl2 speexdsp zlib zstd Catch2 
             #molten-vk vulkan-headers vulkan-loader
@@ -56,7 +56,6 @@ jobs:
           brew install vulkan-loader@1.3.250
           
           # Create necessary symlinks
-          brew link --force glslang@11
           brew link --force molten-vk@1.2.1
           brew link --force vulkan-headers@1.3.250
           brew link --force vulkan-loader@1.3.250
