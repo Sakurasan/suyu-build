@@ -11,13 +11,13 @@ jobs:
   build:
     strategy:
       matrix:
-        runner: [macos-13, macos-14]  # Intel (13) and Apple Silicon (14) runners
+        runner: [macos-13, macos-latest]  # Intel (13) and Apple Silicon (14) runners
         include:
           - runner: macos-13
             homebrew_prefix: /usr/local
             osx_deployment_target: 10.15
             arch: x86_64
-          - runner: macos-14
+          - runner: macos-latest
             homebrew_prefix: /opt/homebrew
             osx_deployment_target: 11.0
             arch: arm64
@@ -47,13 +47,8 @@ jobs:
           brew install \
             autoconf automake boost ccache ffmpeg fmt glslang hidapi \
             libtool libusb lz4 ninja nlohmann-json openssl pkg-config \
-            qt@5 sdl2 speexdsp zlib zstd Catch2 molten-vk \
-            vulkan-headers vulkan-loader
-          
-          # Verify critical dependencies
-          brew list qt@5
-          brew list boost
-          brew list ninja
+            qt@5 sdl2 speexdsp zlib zstd Catch2 \
+            molten-vk vulkan-headers vulkan-loader
 
       - name: Checkout Repository
         run: |
@@ -69,6 +64,11 @@ jobs:
       - name: Configure CMake
         working-directory: build
         run: |
+          # Set specific Vulkan environment variables
+          export VULKAN_SDK=${{ matrix.homebrew_prefix }}/opt/vulkan-headers@1.3.250
+          export VK_ICD_FILENAMES=${{ matrix.homebrew_prefix }}/share/vulkan/icd.d/MoltenVK_icd.json
+          export VK_LAYER_PATH=${{ matrix.homebrew_prefix }}/share/vulkan/explicit_layer.d
+                  
           cmake .. -GNinja \
             -DCMAKE_BUILD_TYPE=Release \
             -DSUYU_USE_BUNDLED_VCPKG=OFF \
