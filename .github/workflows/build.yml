@@ -48,7 +48,49 @@ jobs:
             autoconf automake boost ccache ffmpeg fmt glslang hidapi \
             libtool libusb lz4 ninja nlohmann-json openssl pkg-config \
             qt@5 sdl2 speexdsp zlib zstd Catch2 \
-            molten-vk vulkan-headers vulkan-loader
+            molten-vk 
+            #vulkan-headers vulkan-loader
+
+      - name: Install Vulkan SDK Components
+        run: |
+          # Set up version variables
+          VULKAN_VERSION="1.3.274"
+          INSTALL_DIR="${{ matrix.homebrew_prefix }}/opt/vulkan-sdk"
+          
+          # Create installation directory
+          sudo mkdir -p $INSTALL_DIR
+          sudo chown $USER $INSTALL_DIR
+          
+          # Build and install Vulkan-Headers
+          git clone --depth 1 --branch v${VULKAN_VERSION} https://github.com/KhronosGroup/Vulkan-Headers.git
+          cd Vulkan-Headers
+          cmake -B build -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR
+          cmake --build build
+          cmake --install build
+          cd ..
+          
+          # Build and install Vulkan-Loader
+          git clone --depth 1 --branch v${VULKAN_VERSION} https://github.com/KhronosGroup/Vulkan-Loader.git
+          cd Vulkan-Loader
+          cmake -B build \
+            -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
+            -DVULKAN_HEADERS_INSTALL_DIR=$INSTALL_DIR \
+            -DCMAKE_BUILD_TYPE=Release
+          cmake --build build
+          cmake --install build
+          cd ..
+          
+          # Set up environment variables
+          echo "VULKAN_SDK=$INSTALL_DIR" >> $GITHUB_ENV
+          echo "VK_LAYER_PATH=$INSTALL_DIR/share/vulkan/explicit_layer.d" >> $GITHUB_ENV
+          echo "VK_ICD_FILENAMES=${{ matrix.homebrew_prefix }}/share/vulkan/icd.d/MoltenVK_icd.json" >> $GITHUB_ENV
+          
+          # Add to pkg-config path
+          echo "PKG_CONFIG_PATH=$INSTALL_DIR/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
+          
+          # Add to library path
+          echo "LIBRARY_PATH=$INSTALL_DIR/lib:$LIBRARY_PATH" >> $GITHUB_ENV
+          echo "LD_LIBRARY_PATH=$INSTALL_DIR/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
 
       - name: Checkout Repository
         run: |
