@@ -34,18 +34,12 @@ jobs:
       MACOS_ARCH: ${{ matrix.arch }}
 
     steps:
-      - name: Checkout Repository
+      - name: Install CMake
         run: |
           echo ${{ github.event.repository.owner.login }}
           system_profiler SPHardwareDataType
-          git clone --recursive https://git.suyu.dev/suyu/suyu.git .
-          git checkout dev
-          git submodule update --init --recursive
-
-      - name: Install CMake
-        run: |
           brew update
-          brew install git ffmpeg boost cmake molten-vk vulkan-loader
+          brew install git boost cmake
           cmake --version
 
       - name: Install Other Dependencies
@@ -61,7 +55,12 @@ jobs:
           brew list boost
           brew list ninja
 
-
+      - name: Checkout Repository
+        run: |
+          git clone --recursive https://git.suyu.dev/suyu/suyu.git .
+          # git checkout dev
+          git submodule update --init --recursive
+  
       - name: Prepare Build Environment
         run: |
           mkdir -p build
@@ -79,7 +78,7 @@ jobs:
             -DSDL_ARMNEON=ON \
             -DENABLE_QT6=OFF \
             -DENABLE_QT_TRANSLATION=ON \
-            -DSUYU_USE_EXTERNAL_VULKAN_HEADERS=ON \
+            -DSUYU_USE_EXTERNAL_VULKAN_HEADERS=OFF \
             -DCLANG_FORMAT=ON \
             -DCMAKE_OSX_ARCHITECTURES=${{ env.MACOS_ARCH }} \
             -DCMAKE_OSX_DEPLOYMENT_TARGET=${{ matrix.osx_deployment_target }} \
