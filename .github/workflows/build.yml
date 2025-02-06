@@ -49,7 +49,7 @@ jobs:
 
       - name: Install Vulkan SDK Components
         run: |
-          cd externals/Vulkan-Headers&&git checkout v1.4.307 && cd ../..
+          cd externals/Vulkan-Headers&&git checkout v1.4.307 && cd ../.. && \
           cd externals/Vulkan-Utility-Libraries&&git checkout v1.4.307 && cd ../..
   
       - name: Prepare Build Environment
