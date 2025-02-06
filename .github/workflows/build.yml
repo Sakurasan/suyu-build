@@ -47,11 +47,12 @@ jobs:
           brew install \
             autoconf automake boost ccache ffmpeg fmt glslang hidapi \
             libtool libusb lz4 ninja nlohmann-json openssl pkg-config \
-            qt@5 sdl2 speexdsp zlib zstd Catch2 
-            #molten-vk vulkan-headers vulkan-loader
+            qt@5 sdl2 speexdsp zlib zstd Catch2 \
+            molten-vk 
+            #vulkan-headers vulkan-loader
 
           # Install specific versions of Vulkan components
-          brew install --force-bottle molten-vk@1.2.1
+          # brew install --force-bottle molten-vk@1.2.1
           brew install vulkan-headers@1.3.250
           brew install vulkan-loader@1.3.250
           
