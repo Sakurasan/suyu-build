@@ -36,6 +36,7 @@ jobs:
     steps:
       - name: Checkout Repository
         run: |
+          system_profiler SPHardwareDataType
           git clone --recursive https://git.suyu.dev/suyu/suyu.git .
           git checkout dev
 
