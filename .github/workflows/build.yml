@@ -49,16 +49,17 @@ jobs:
             libtool libusb lz4 ninja nlohmann-json openssl pkg-config \
             qt@5 sdl2 speexdsp zlib zstd Catch2 \
             molten-vk vulkan-headers vulkan-loader
-      - name: Install Vulkan SDK Components
-        run: |
-          cd externals/Vulkan-Headers&&git checkout v1.4.307 && cd ../.. && \
-          cd externals/Vulkan-Utility-Libraries&&git checkout v1.4.307 && cd ../..
 
       - name: Checkout Repository
         run: |
           git clone --recursive https://git.suyu.dev/suyu/suyu.git .
           # git checkout dev
           git submodule update --init --recursive
+
+      - name: Install Vulkan SDK Components
+        run: |
+          cd externals/Vulkan-Headers&&git checkout v1.4.307 && cd ../.. && \
+          cd externals/Vulkan-Utility-Libraries&&git checkout v1.4.307 && cd ../..
   
       - name: Prepare Build Environment
         run: |
