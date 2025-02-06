@@ -42,7 +42,7 @@ jobs:
       - name: Install Other Dependencies
         run: |
           brew install \
-            autoconf automake boost ccache ffmpeg fmt glslang hidapi \
+            autoconf automake boost@1.85 ccache ffmpeg fmt glslang hidapi \
             libtool libusb lz4 ninja nlohmann-json openssl pkg-config \
             qt@5 sdl2 speexdsp zlib zstd Catch2 \
             molten-vk vulkan-headers vulkan-loader
