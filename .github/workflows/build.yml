@@ -39,7 +39,7 @@ jobs:
           echo ${{ github.event.repository.owner.login }}
           system_profiler SPHardwareDataType
           brew update
-          brew install git boost@1.76 cmake
+          brew install git cmake
           cmake --version
 
       - name: Install Other Dependencies
